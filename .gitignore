@@ -1,0 +1,43 @@
+# Python
+backend/.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+*.egg
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Storage & DB
+storage/videos/
+storage/audio/
+storage/thumbnails/
+storage/*.db
+storage/*.db-wal
+storage/*.db-shm
+# Cookies contain session tokens — never commit
+storage/cookies.txt
+storage/cookies/
+
+# Env
+.env
+*.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Build artifacts
+frontend/tsconfig.tsbuildinfo
+
+# Agent / editor local state
+.claude/

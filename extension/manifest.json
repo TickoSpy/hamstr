@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "YT Archiver",
+  "version": "1.0.0",
+  "description": "Archive the page you are reading to your self-hosted archive, exactly as your browser sees it.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "hamstr@tickospy.github.io",
+      "strict_min_version": "115.0"
+    }
+  },
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "notifications",
+    "cookies",
+    "contextualIdentities"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "scripts": ["background.js", "login.js"]
+  },
+  "action": {
+    "default_title": "Archive this page"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": false
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Ctrl+Shift+S" },
+      "description": "Archive this page"
+    }
+  }
+}

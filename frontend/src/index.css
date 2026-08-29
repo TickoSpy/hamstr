@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+  }
+  html, body {
+    @apply bg-gray-950 text-gray-100 antialiased;
+  }
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .mb-player {
+    /* Reserve space for the MiniPlayer + iOS home indicator */
+    margin-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+  .touch-callout-none {
+    -webkit-touch-callout: none;
+  }
+}
+
+/* ---------- Reader ----------
+   Themes are scoped to the reader subtree via data-reader-theme rather than
+   flipping the whole app to light mode — every other component hardcodes
+   gray-950 backgrounds. */
+
+[data-reader-theme="light"] {
+  --reader-bg: #ffffff;
+  --reader-fg: #1c1c1e;
+  --reader-muted: #6b7280;
+  --reader-rule: #e5e7eb;
+  --reader-link: #1d4ed8;
+  --reader-quote: #f3f4f6;
+}
+[data-reader-theme="sepia"] {
+  --reader-bg: #f8f1e3;
+  --reader-fg: #3b3226;
+  --reader-muted: #7a6a55;
+  --reader-rule: #e3d8c2;
+  --reader-link: #8a5a1f;
+  --reader-quote: #f0e6d2;
+}
+[data-reader-theme="dark"] {
+  --reader-bg: #0b0b0d;
+  --reader-fg: #e6e6e6;
+  --reader-muted: #9ca3af;
+  --reader-rule: #26262b;
+  --reader-link: #93c5fd;
+  --reader-quote: #16161a;
+}
+
+@layer components {
+  /* The sanitizer strips class/style from archived markup, so everything here
+     has to be a tag selector. That is the trade: no CSS injection surface, no
+     per-element styling. */
+  .reader-content {
+    font-family: theme("fontFamily.serif");
+    font-size: var(--reader-size, 17.5px);
+    line-height: 1.65;
+    letter-spacing: 0.003em;
+    color: var(--reader-fg);
+    overflow-wrap: break-word;
+  }
+  .reader-content p,
+  .reader-content ul,
+  .reader-content ol,
+  .reader-content dl,
+  .reader-content pre,
+  .reader-content table,
+  .reader-content figure,
+  .reader-content blockquote {
+    margin: 1.15em 0;
+  }
+  .reader-content h1,
+  .reader-content h2,
+  .reader-content h3,
+  .reader-content h4 {
+    font-weight: 600;
+    line-height: 1.25;
+    margin: 1.8em 0 0.6em;
+  }
+  .reader-content h1 { font-size: 1.6em; }
+  .reader-content h2 { font-size: 1.35em; }
+  .reader-content h3 { font-size: 1.15em; }
+  .reader-content h4 { font-size: 1.02em; }
+  .reader-content a {
+    color: var(--reader-link);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .reader-content strong, .reader-content b { font-weight: 650; }
+  .reader-content blockquote {
+    padding: 0.6em 1.1em;
+    border-left: 3px solid var(--reader-rule);
+    background: var(--reader-quote);
+    border-radius: 0 4px 4px 0;
+  }
+  .reader-content blockquote p:first-child { margin-top: 0; }
+  .reader-content blockquote p:last-child { margin-bottom: 0; }
+  .reader-content ul { list-style: disc; padding-left: 1.5em; }
+  .reader-content ol { list-style: decimal; padding-left: 1.6em; }
+  .reader-content li { margin: 0.35em 0; }
+  .reader-content img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    border-radius: 6px;
+    cursor: zoom-in;
+  }
+  .reader-content figcaption {
+    font-family: theme("fontFamily.sans");
+    font-size: 0.8em;
+    color: var(--reader-muted);
+    text-align: center;
+    margin-top: 0.5em;
+  }
+  .reader-content pre {
+    font-family: theme("fontFamily.mono");
+    font-size: 0.85em;
+    line-height: 1.5;
+    padding: 0.9em 1em;
+    background: var(--reader-quote);
+    border: 1px solid var(--reader-rule);
+    border-radius: 6px;
+    /* Wide code must scroll inside its own box, never the page. */
+    overflow-x: auto;
+  }
+  .reader-content :not(pre) > code {
+    font-family: theme("fontFamily.mono");
+    font-size: 0.86em;
+    padding: 0.12em 0.34em;
+    background: var(--reader-quote);
+    border-radius: 4px;
+  }
+  .reader-content hr {
+    border: 0;
+    border-top: 1px solid var(--reader-rule);
+    margin: 2em 0;
+  }
+  .reader-content table {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-size: 0.9em;
+  }
+  .reader-content th, .reader-content td {
+    border: 1px solid var(--reader-rule);
+    padding: 0.4em 0.6em;
+    text-align: left;
+  }
+  .reader-content th { font-weight: 600; background: var(--reader-quote); }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slide-up 0.22s ease-out;
+}

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>YT Archiver — Options</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+        margin: 0;
+        padding: 18px;
+        min-width: 340px;
+      }
+      h1 { font-size: 15px; margin: 0 0 14px; }
+      label { display: block; font-weight: 600; margin-bottom: 5px; }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 7px 9px;
+        border: 1px solid #9993;
+        border-radius: 6px;
+        font: inherit;
+        background: Field;
+        color: FieldText;
+      }
+      .hint { color: #6b7280; font-size: 12px; margin: 6px 0 14px; }
+      button {
+        padding: 7px 14px;
+        border: 0;
+        border-radius: 6px;
+        background: #dc2626;
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover { background: #b91c1c; }
+      #status { display: block; margin-top: 10px; font-size: 13px; }
+      .ok { color: #16a34a; }
+      .bad { color: #dc2626; }
+    </style>
+  </head>
+  <body>
+    <h1>YT Archiver</h1>
+
+    <label for="serverUrl">Archive address</label>
+    <input id="serverUrl" type="url" placeholder="https://hamstr.example.com" />
+    <p class="hint">
+      The base URL of your archive — no trailing path. Captures are posted to
+      <code>/api/videos/capture</code>.
+    </p>
+
+    <label style="font-weight:400;display:flex;gap:8px;align-items:flex-start;margin-bottom:14px">
+      <input id="archiveFallback" type="checkbox" style="width:auto;margin-top:3px" />
+      <span>
+        Recover paywalled pages from archive.today
+        <span class="hint" style="margin:2px 0 0">
+          If the archive reports a paywall it couldn't get past, fetch a copy
+          from archive.today here — it refuses servers but answers browsers.
+        </span>
+      </span>
+    </label>
+
+    <label for="adminToken">Admin token</label>
+    <input id="adminToken" type="password" autocomplete="off" placeholder="ADMIN_TOKEN from the backend" />
+    <p class="hint">
+      Only needed to sign the archive in to sites. Must match <code>ADMIN_TOKEN</code>
+      on the backend. Kept in local storage on this machine only — unlike the
+      address, it is never sent through Firefox Sync.
+    </p>
+
+    <button id="save">Save</button>
+    <button id="test" style="background:#4b5563">Test</button>
+    <button id="grant" hidden style="background:#d97706">Grant site access</button>
+    <span id="status"></span>
+
+    <script src="options.js"></script>
+  </body>
+</html>

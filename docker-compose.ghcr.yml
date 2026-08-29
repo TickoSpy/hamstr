@@ -1,0 +1,43 @@
+# Prebuilt images instead of a local build — skips the multi-minute first build.
+#
+#   docker compose -f docker-compose.ghcr.yml up -d
+#
+# The images are published from main by .github/workflows/docker-build.yml.
+# Use the regular docker-compose.yml if you have local changes to build.
+services:
+  backend:
+    image: ghcr.io/tickospy/hamstr/backend:latest
+    volumes:
+      - ./storage:/app/storage
+    environment:
+      - STORAGE_ROOT=/app/storage
+      - DATABASE_URL=sqlite+aiosqlite:////app/storage/hamstr.db
+      - DOWNLOAD_WORKERS=1
+      - MAX_CONCURRENT_FFMPEG=2
+      # Required to sign the archive in to sites (Settings → Site logins).
+      # Unset disables those routes; it never leaves them unguarded.
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - internal
+
+  frontend:
+    image: ghcr.io/tickospy/hamstr/frontend:latest
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge

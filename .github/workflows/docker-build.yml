@@ -1,0 +1,39 @@
+name: Docker Build
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build and push Docker images
+    runs-on: ubuntu-latest
+    # GHCR is GitHub's registry and the login below uses GitHub's built-in token,
+    # so this job has nothing to do on a mirror running its own Actions.
+    if: github.server_url == 'https://github.com'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/backend.Dockerfile
+          push: true
+          tags: ghcr.io/tickospy/hamstr/backend:latest
+
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/frontend.Dockerfile
+          push: true
+          tags: ghcr.io/tickospy/hamstr/frontend:latest

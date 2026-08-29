@@ -1,0 +1,7 @@
+-r requirements.txt
+ruff==0.15.15  # pinned: ruff's formatter changes between releases; an unpinned range silently breaks `ruff format --check` in CI
+pytest>=8.0
+pytest-asyncio>=0.23
+httpx>=0.27
+anyio>=4.0
+respx>=0.22

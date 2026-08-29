@@ -1,0 +1,197 @@
+import mimetypes
+import re
+from urllib.parse import quote
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import settings
+from app.database import get_db
+from app.models.video import Video
+
+router = APIRouter(prefix="/stream", tags=["stream"])
+
+# Archived markup is served inert: no scripts, no network, no framing surprises,
+# whether it's loaded top-level or inside our own sandboxed iframe.
+INERT_CSP = (
+    "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox"
+)
+_INERT_TYPES = frozenset({"text/html", "application/xhtml+xml", "image/svg+xml"})
+
+
+def _content_disposition(disposition: str, filename: str) -> str:
+    """RFC 6266 header with both an ASCII fallback and a UTF-8 form — archived
+    filenames are frequently non-ASCII."""
+    ascii_name = filename.encode("ascii", "replace").decode("ascii").replace('"', "")
+    return (
+        f'{disposition}; filename="{ascii_name}"; '
+        f"filename*=UTF-8''{quote(filename, safe='')}"
+    )
+
+
+# Without an explicit policy Starlette still sends ETag/Last-Modified, so every
+# image costs a revalidation round-trip on every page view. These let the browser
+# skip the network entirely.
+CACHE_IMMUTABLE = "public, max-age=31536000, immutable"
+CACHE_MEDIUM = "public, max-age=86400"
+CACHE_SHORT = "public, max-age=3600"
+
+
+def _file_response(
+    rel_path: str | None,
+    media_type: str,
+    *,
+    filename: str | None = None,
+    disposition: str = "inline",
+    cache_control: str = CACHE_SHORT,
+    extra_headers: dict[str, str] | None = None,
+) -> FileResponse:
+    if not rel_path:
+        raise HTTPException(status_code=404, detail="File not available")
+    root = settings.storage_root.resolve()
+    path = (root / rel_path).resolve()
+    if not path.is_relative_to(root):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    headers: dict[str, str] = {
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": cache_control,
+    }
+    if media_type in _INERT_TYPES:
+        headers["Content-Security-Policy"] = INERT_CSP
+    if filename:
+        headers["Content-Disposition"] = _content_disposition(disposition, filename)
+    elif disposition == "attachment":
+        headers["Content-Disposition"] = "attachment"
+    if extra_headers:
+        headers.update(extra_headers)
+
+    return FileResponse(path, media_type=media_type, headers=headers)
+
+
+async def _get_video(video_id: str, db: AsyncSession) -> Video:
+    video = await db.get(Video, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    if video.status != "completed":
+        raise HTTPException(
+            status_code=409, detail=f"Video status is '{video.status}', not completed"
+        )
+    return video
+
+
+@router.get("/{video_id}/video")
+async def stream_video(video_id: str, db: AsyncSession = Depends(get_db)):
+    video = await _get_video(video_id, db)
+    return _file_response(video.video_path, "video/mp4", cache_control=CACHE_MEDIUM)
+
+
+@router.get("/{video_id}/audio/mp3")
+async def stream_mp3(video_id: str, db: AsyncSession = Depends(get_db)):
+    video = await _get_video(video_id, db)
+    return _file_response(video.audio_mp3_path, "audio/mpeg")
+
+
+@router.get("/{video_id}/audio/ogg")
+async def stream_ogg(video_id: str, db: AsyncSession = Depends(get_db)):
+    video = await _get_video(video_id, db)
+    return _file_response(video.audio_ogg_path, "audio/ogg")
+
+
+@router.get("/{video_id}/file")
+async def stream_file(
+    video_id: str,
+    download: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """The item's primary artifact — PDF, image, loose media file, saved page."""
+    video = await _get_video(video_id, db)
+    return _file_response(
+        video.file_path,
+        video.mime_type or "application/octet-stream",
+        filename=video.file_name,
+        disposition="attachment" if download else "inline",
+    )
+
+
+@router.get("/{video_id}/article")
+async def get_article(
+    video_id: str,
+    raw: bool = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """The sanitized reader HTML, or the raw saved page with `?raw=1`.
+
+    Served as HTML rather than JSON so the existing service worker (which already
+    intercepts all of /stream/*) caches it for offline reading unchanged, and so
+    the raw variant can be dropped straight into a sandboxed iframe.
+    """
+    video = await _get_video(video_id, db)
+    rel = video.raw_html_path if raw else video.article_html_path
+    if not rel:
+        raise HTTPException(
+            status_code=404,
+            detail="Raw page not available" if raw else "No reader view for this item",
+        )
+    return _file_response(rel, "text/html")
+
+
+# Asset names are generated by sanitize.asset_filename (sha256 + extension), so
+# anything outside this shape is not ours.
+_ASSET_NAME_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
+
+
+@router.get("/{video_id}/asset/{name}")
+async def get_article_asset(
+    video_id: str, name: str, db: AsyncSession = Depends(get_db)
+):
+    """An image belonging to an archived article."""
+    if ".." in name or not _ASSET_NAME_RE.match(name):
+        raise HTTPException(status_code=400, detail="Invalid asset name")
+
+    video = await _get_video(video_id, db)
+    if video.kind != "article":
+        raise HTTPException(status_code=404, detail="Item has no assets")
+
+    media_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    return _file_response(
+        f"articles/{video_id}/assets/{name}",
+        media_type,
+        cache_control=CACHE_IMMUTABLE,
+    )
+
+
+@router.get("/{video_id}/thumbnail")
+async def get_thumbnail(video_id: str, db: AsyncSession = Depends(get_db)):
+    video = await db.get(Video, video_id)
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+    if not video.thumbnail_path:
+        raise HTTPException(status_code=404, detail="Thumbnail not available")
+    root = settings.storage_root.resolve()
+    path = (root / video.thumbnail_path).resolve()
+    if not path.is_relative_to(root):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Thumbnail file not found")
+    suffix = path.suffix.lower()
+    media_type = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".avif": "image/avif",
+    }.get(suffix, "image/webp")
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            # A re-capture rewrites this path, so revalidate daily rather than
+            # pinning it for a year.
+            "Cache-Control": CACHE_MEDIUM,
+        },
+    )

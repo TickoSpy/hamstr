@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend.Dockerfile
+    volumes:
+      - ./storage:/app/storage
+    environment:
+      - STORAGE_ROOT=/app/storage
+      - DATABASE_URL=sqlite+aiosqlite:////app/storage/hamstr.db
+      - DOWNLOAD_WORKERS=1
+      - MAX_CONCURRENT_FFMPEG=2
+      # Required to sign the archive in to sites (Settings → Site logins).
+      # Unset disables those routes; it never leaves them unguarded.
+      - ADMIN_TOKEN=${ADMIN_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - internal
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
